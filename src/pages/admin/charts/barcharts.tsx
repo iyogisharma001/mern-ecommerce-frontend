@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSelector } from "react-redux";
 import AdminSidebar from "../../../components/admin/AdminSidebar";
 import { BarChart } from "../../../components/admin/Charts";
@@ -19,10 +20,10 @@ const Barcharts = () => {
   const orders = data?.charts.orders || [];
   const users = data?.charts.users || [];
 
-  if (isError) {
-    const err = error as CustomError;
-    toast.error(err.data.message);
-  }
+  useEffect(() => {
+    if (isError)
+      toast.error((error as CustomError)?.data?.message || "Something went wrong");
+  }, [isError, error]);
 
   return (
     <div className="admin-container">

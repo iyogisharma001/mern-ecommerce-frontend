@@ -1,15 +1,14 @@
-import { useFetchData } from "6pp";
 import { ReactElement, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { FaPlus } from "react-icons/fa6";
-import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { Column } from "react-table";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import TableHOC from "../../components/admin/TableHOC";
 import { Skeleton } from "../../components/loader";
-import { RootState, server } from "../../redux/store";
+import { server } from "../../redux/store";
 import { AllDiscountResponse } from "../../types/api-types";
+import { useAuthFetch } from "../../utils/useAuthFetch";
 
 interface DataType {
   code: string;
@@ -39,15 +38,13 @@ const columns: Column<DataType>[] = [
 ];
 
 const Discount = () => {
-  const { user } = useSelector((state: RootState) => state.userReducer);
-
   const {
     data,
     loading: isLoading,
     error,
-  } = useFetchData<AllDiscountResponse>(
-    `${server}/api/v1/payment/coupon/all?id=${user?._id}`,
-    "discount-codes"
+  } = useAuthFetch<AllDiscountResponse>(
+    // no ?id=: the admin is identified by the Bearer token
+    `${server}/api/v1/payment/coupon/all`
   );
 
   const [rows, setRows] = useState<DataType[]>([]);
@@ -60,7 +57,9 @@ const Discount = () => {
     rows.length > 6
   )();
 
-  if (error) toast.error(error);
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
 
   useEffect(() => {
     if (data)

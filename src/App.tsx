@@ -56,13 +56,21 @@ const App = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return dispatch(userNotExist());
+
+      try {
         const data = await getUser(user.uid);
         dispatch(userExist(data.user));
-      } else dispatch(userNotExist());
+      } catch {
+        // Signed in with Google but no account in our DB yet (sign-up not
+        // finished) -> treat as logged out instead of spinning forever
+        dispatch(userNotExist());
+      }
     });
-  }, []);
+
+    return () => unsubscribe();
+  }, [dispatch]);
 
   return loading ? (
     <Loader />

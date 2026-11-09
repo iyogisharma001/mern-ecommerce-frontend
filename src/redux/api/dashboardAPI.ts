@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { authBaseQuery } from "./baseQuery";
 import {
   BarResponse,
   LineResponse,
@@ -8,24 +9,25 @@ import {
 
 export const dashboardApi = createApi({
   reducerPath: "dashboardApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_SERVER}/api/v1/dashboard/`,
-  }),
+  baseQuery: authBaseQuery("dashboard"),
   endpoints: (builder) => ({
+    // The string arg (user id) is no longer sent - the server reads the user
+    // from the Bearer token. It is kept so callers compile and so RTK caches
+    // per user.
     stats: builder.query<StatsResponse, string>({
-      query: (id) => `stats?id=${id}`,
+      query: () => "stats",
       keepUnusedDataFor: 0,
     }),
     pie: builder.query<PieResponse, string>({
-      query: (id) => `pie?id=${id}`,
+      query: () => "pie",
       keepUnusedDataFor: 0,
     }),
     bar: builder.query<BarResponse, string>({
-      query: (id) => `bar?id=${id}`,
+      query: () => "bar",
       keepUnusedDataFor: 0,
     }),
     line: builder.query<LineResponse, string>({
-      query: (id) => `line?id=${id}`,
+      query: () => "line",
       keepUnusedDataFor: 0,
     }),
   }),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ProductCard from "../components/product-card";
 import {
   useCategoriesQuery,
@@ -49,17 +49,26 @@ const Search = () => {
     toast.success("Added to cart");
   };
 
-  const isPrevPage = page > 1;
-  const isNextPage = page < 4;
+  // Go back to page 1 whenever a filter changes (else you can land on an empty page)
+  useEffect(() => {
+    setPage(1);
+  }, [search, sort, category, maxPrice]);
 
-  if (isError) {
-    const err = error as CustomError;
-    toast.error(err.data.message);
-  }
-  if (productIsError) {
-    const err = productError as CustomError;
-    toast.error(err.data.message);
-  }
+  const totalPage = searchedData?.totalPage || 1;
+  const isPrevPage = page > 1;
+  const isNextPage = page < totalPage; // was hard-coded to 4
+
+  // Toast once per error, not on every render
+  useEffect(() => {
+    if (isError)
+      toast.error((error as CustomError)?.data?.message || "Something went wrong");
+  }, [isError, error]);
+  useEffect(() => {
+    if (productIsError)
+      toast.error(
+        (productError as CustomError)?.data?.message || "Something went wrong"
+      );
+  }, [productIsError, productError]);
   return (
     <div className="product-search-page">
       <aside>

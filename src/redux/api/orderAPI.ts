@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { authBaseQuery } from "./baseQuery";
 import {
   AllOrdersResponse,
   MessageResponse,
@@ -9,9 +10,7 @@ import {
 
 export const orderApi = createApi({
   reducerPath: "orderApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_SERVER}/api/v1/order/`,
-  }),
+  baseQuery: authBaseQuery("order"),
   tagTypes: ["orders"],
   endpoints: (builder) => ({
     newOrder: builder.mutation<MessageResponse, NewOrderRequest>({
@@ -22,30 +21,32 @@ export const orderApi = createApi({
       }),
       invalidatesTags: ["orders"],
     }),
+    // ?id= removed: the server identifies the user from the Bearer token.
+    // userId / string args are kept only so existing callers still compile.
     updateOrder: builder.mutation<MessageResponse, UpdateOrderRequest>({
-      query: ({ userId, orderId }) => ({
-        url: `${orderId}?id=${userId}`,
+      query: ({ orderId }) => ({
+        url: orderId,
         method: "PUT",
       }),
       invalidatesTags: ["orders"],
     }),
     deleteOrder: builder.mutation<MessageResponse, UpdateOrderRequest>({
-      query: ({ userId, orderId }) => ({
-        url: `${orderId}?id=${userId}`,
+      query: ({ orderId }) => ({
+        url: orderId,
         method: "DELETE",
       }),
       invalidatesTags: ["orders"],
     }),
     myOrders: builder.query<AllOrdersResponse, string>({
-      query: (id) => `my?id=${id}`,
+      query: () => "my",
       providesTags: ["orders"],
     }),
     allOrders: builder.query<AllOrdersResponse, string>({
-      query: (id) => `all?id=${id}`,
+      query: () => "all",
       providesTags: ["orders"],
     }),
     orderDetails: builder.query<OrderDetailsResponse, string>({
-      query: (id) => id,
+      query: (id) => encodeURIComponent(id),
       providesTags: ["orders"],
     }),
   }),

@@ -42,7 +42,7 @@ const ProductDetails = () => {
   const [createReview] = useNewReviewMutation();
   const [deleteReview] = useDeleteReviewMutation();
 
-  const decrement = () => setQuantity((prev) => prev - 1);
+  const decrement = () => setQuantity((prev) => Math.max(1, prev - 1));
   const increment = () => {
     if (data?.product?.stock === quantity)
       return toast.error(`${data?.product?.stock} available only`);
@@ -55,8 +55,6 @@ const ProductDetails = () => {
     dispatch(addToCart(cartItem));
     toast.success("Added to cart");
   };
-
-  if (isError) return <Navigate to="/404" />;
 
   const showDialog = () => {
     reviewDialogRef.current?.showModal();
@@ -78,6 +76,10 @@ const ProductDetails = () => {
     },
   });
 
+  // Early return moved BELOW all hooks (it used to sit above useRating,
+  // which breaks React's rules of hooks and crashes the page)
+  if (isError) return <Navigate to="/404" />;
+
   const reviewCloseHandler = () => {
     reviewDialogRef.current?.close();
     setRating(0);
@@ -86,6 +88,7 @@ const ProductDetails = () => {
 
   const submitReview = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (rating < 1) return toast.error("Please select a rating");
     setReviewSubmitLoading(true);
     reviewCloseHandler();
 

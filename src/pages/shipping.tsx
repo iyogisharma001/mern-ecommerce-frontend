@@ -11,7 +11,6 @@ const Shipping = () => {
   const { cartItems, coupon } = useSelector(
     (state: RootState) => state.cartReducer
   );
-  const { user } = useSelector((state: RootState) => state.userReducer);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -37,9 +36,14 @@ const Shipping = () => {
 
     try {
       const { data } = await axios.post(
-        `${server}/api/v1/payment/create?id=${user?._id}`,
+        // no ?id=: the server takes the user from the Bearer token
+        `${server}/api/v1/payment/create`,
         {
-          items: cartItems,
+          // only ids + quantities: the server looks up the real prices
+          items: cartItems.map((i) => ({
+            productId: i.productId,
+            quantity: i.quantity,
+          })),
           shippingInfo,
           coupon,
         },
@@ -54,8 +58,10 @@ const Shipping = () => {
         state: data.clientSecret,
       });
     } catch (error) {
-      console.log(error);
-      toast.error("Something went wrong");
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message
+        : undefined;
+      toast.error(message || "Something went wrong");
     }
   };
 

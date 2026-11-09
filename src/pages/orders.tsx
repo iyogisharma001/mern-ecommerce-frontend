@@ -1,10 +1,12 @@
-import { ReactElement, useEffect, useState } from "react";
+import { ReactElement, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useSearchParams } from "react-router-dom";
 import { Column } from "react-table";
 import TableHOC from "../components/admin/TableHOC";
 import { Skeleton } from "../components/loader";
-import { useMyOrdersQuery } from "../redux/api/orderAPI";
+import { useMyOrdersQuery, useNewOrderMutation } from "../redux/api/orderAPI";
+import { resetCart } from "../redux/reducer/cartReducer";
 import { RootState } from "../redux/store";
 import { CustomError } from "../types/api-types";
 
@@ -14,6 +16,7 @@ type DataType = {
   quantity: number;
   discount: number;
   status: ReactElement;
+  action: ReactElement;
 };
 
 const column: Column<DataType>[] = [
@@ -37,19 +40,55 @@ const column: Column<DataType>[] = [
     Header: "Status",
     accessor: "status",
   },
+  {
+    Header: "Action",
+    accessor: "action",
+  },
 ];
 
 const Orders = () => {
   const { user } = useSelector((state: RootState) => state.userReducer);
+  const dispatch = useDispatch();
 
   const { isLoading, data, isError, error } = useMyOrdersQuery(user?._id!);
+  const [newOrder] = useNewOrderMutation();
 
   const [rows, setRows] = useState<DataType[]>([]);
 
-  if (isError) {
-    const err = error as CustomError;
-    toast.error(err.data.message);
-  }
+  // Coming back from a 3-D Secure redirect: Stripe adds ?payment_intent=...
+  const [searchParams, setSearchParams] = useSearchParams();
+  const confirmedRef = useRef(false);
+
+  useEffect(() => {
+    const paymentIntentId = searchParams.get("payment_intent");
+    const status = searchParams.get("redirect_status");
+    if (!paymentIntentId || confirmedRef.current) return;
+    confirmedRef.current = true;
+
+    setSearchParams({}, { replace: true });
+
+    if (status !== "succeeded") {
+      toast.error("Payment was not completed");
+      return;
+    }
+
+    newOrder({ paymentIntentId }).then((res) => {
+      if ("data" in res) {
+        dispatch(resetCart());
+        toast.success(res.data.message);
+      } else {
+        toast.error(
+          "Payment received, but we couldn't confirm the order yet. Refresh in a minute."
+        );
+      }
+    });
+  }, [searchParams, setSearchParams, newOrder, dispatch]);
+
+  // Toast once per error, not on every render
+  useEffect(() => {
+    if (isError)
+      toast.error((error as CustomError)?.data?.message || "Something went wrong");
+  }, [isError, error]);
 
   useEffect(() => {
     if (data)
@@ -72,6 +111,7 @@ const Orders = () => {
               {i.status}
             </span>
           ),
+          action: <Link to={`/order/${i._id}`}>View</Link>,
         }))
       );
   }, [data]);

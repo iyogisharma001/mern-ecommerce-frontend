@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { authBaseQuery } from "./baseQuery";
 import {
   AllProductsResponse,
   AllReviewsResponse,
@@ -16,17 +17,17 @@ import {
 
 export const productAPI = createApi({
   reducerPath: "productApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${import.meta.env.VITE_SERVER}/api/v1/product/`,
-  }),
+  baseQuery: authBaseQuery("product"),
   tagTypes: ["product"],
   endpoints: (builder) => ({
     latestProducts: builder.query<AllProductsResponse, string>({
       query: () => "latest",
       providesTags: ["product"],
     }),
+    // ?id= removed everywhere below: the server identifies the user from the
+    // Bearer token. id/userId args are kept only so existing callers compile.
     allProducts: builder.query<AllProductsResponse, string>({
-      query: (id) => `admin-products?id=${id}`,
+      query: () => "admin-products",
       providesTags: ["product"],
     }),
     categories: builder.query<CategoriesResponse, string>({
@@ -39,13 +40,14 @@ export const productAPI = createApi({
       SearchProductsRequest
     >({
       query: ({ price, search, sort, category, page }) => {
-        let base = `all?search=${search}&page=${page}`;
+        // URLSearchParams encodes "&", "#", spaces etc. in the search text
+        const params = new URLSearchParams({ search, page: String(page) });
 
-        if (price) base += `&price=${price}`;
-        if (sort) base += `&sort=${sort}`;
-        if (category) base += `&category=${category}`;
+        if (price) params.set("price", String(price));
+        if (sort) params.set("sort", sort);
+        if (category) params.set("category", category);
 
-        return base;
+        return `all?${params.toString()}`;
       },
       providesTags: ["product"],
     }),
@@ -61,8 +63,8 @@ export const productAPI = createApi({
     }),
 
     newReview: builder.mutation<MessageResponse, NewReviewRequest>({
-      query: ({ comment, rating, productId, userId }) => ({
-        url: `review/new/${productId}?id=${userId}`,
+      query: ({ comment, rating, productId }) => ({
+        url: `review/new/${productId}`,
         method: "POST",
         body: { comment, rating },
         headers: {
@@ -73,16 +75,16 @@ export const productAPI = createApi({
     }),
 
     deleteReview: builder.mutation<MessageResponse, DeleteReviewRequest>({
-      query: ({ reviewId, userId }) => ({
-        url: `/review/${reviewId}?id=${userId}`,
+      query: ({ reviewId }) => ({
+        url: `/review/${reviewId}`,
         method: "DELETE",
       }),
       invalidatesTags: ["product"],
     }),
 
     newProduct: builder.mutation<MessageResponse, NewProductRequest>({
-      query: ({ formData, id }) => ({
-        url: `new?id=${id}`,
+      query: ({ formData }) => ({
+        url: "new",
         method: "POST",
         body: formData,
       }),
@@ -90,8 +92,8 @@ export const productAPI = createApi({
     }),
 
     updateProduct: builder.mutation<MessageResponse, UpdateProductRequest>({
-      query: ({ formData, userId, productId }) => ({
-        url: `${productId}?id=${userId}`,
+      query: ({ formData, productId }) => ({
+        url: productId,
         method: "PUT",
         body: formData,
       }),
@@ -99,8 +101,8 @@ export const productAPI = createApi({
     }),
 
     deleteProduct: builder.mutation<MessageResponse, DeleteProductRequest>({
-      query: ({ userId, productId }) => ({
-        url: `${productId}?id=${userId}`,
+      query: ({ productId }) => ({
+        url: productId,
         method: "DELETE",
       }),
       invalidatesTags: ["product"],

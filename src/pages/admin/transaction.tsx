@@ -53,10 +53,10 @@ const Transaction = () => {
 
   const [rows, setRows] = useState<DataType[]>([]);
 
-  if (isError) {
-    const err = error as CustomError;
-    toast.error(err.data.message);
-  }
+  useEffect(() => {
+    if (isError)
+      toast.error((error as CustomError)?.data?.message || "Something went wrong");
+  }, [isError, error]);
 
   useEffect(() => {
     if (data)

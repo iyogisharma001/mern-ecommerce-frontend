@@ -1,13 +1,11 @@
 import {
   Bar,
-  CartItem,
   CouponType,
   Line,
   Order,
   Pie,
   Product,
   Review,
-  ShippingInfo,
   Stats,
   User,
 } from "./types";
@@ -119,15 +117,10 @@ export type DeleteProductRequest = {
   productId: string;
 };
 
+// The server builds the order from the verified Stripe payment,
+// so the client only sends the payment id
 export type NewOrderRequest = {
-  shippingInfo: ShippingInfo;
-  orderItems: CartItem[];
-  subtotal: number;
-  tax: number;
-  shippingCharges: number;
-  discount: number;
-  total: number;
-  user: string;
+  paymentIntentId: string;
 };
 
 export type UpdateOrderRequest = {

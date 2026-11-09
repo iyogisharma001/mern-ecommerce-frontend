@@ -50,6 +50,10 @@ const Cart = () => {
           dispatch(calculatePrice());
         })
         .catch(() => {
+          // Also forget the previously saved code: otherwise the UI shows no
+          // discount but shipping.tsx still sends the old coupon and the
+          // server charges a different (discounted) amount
+          dispatch(saveCoupon(""));
           dispatch(discountApplied(0));
           setIsValidCouponCode(false);
           dispatch(calculatePrice());
@@ -71,12 +75,12 @@ const Cart = () => {
     <div className="cart">
       <main>
         {cartItems.length > 0 ? (
-          cartItems.map((i, idx) => (
+          cartItems.map((i) => (
             <CartItemCard
               incrementHandler={incrementHandler}
               decrementHandler={decrementHandler}
               removeHandler={removeHandler}
-              key={idx}
+              key={i.productId}
               cartItem={i}
             />
           ))

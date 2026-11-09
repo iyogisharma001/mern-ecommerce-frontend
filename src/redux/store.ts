@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { productAPI } from "./api/productAPI";
 import { userAPI } from "./api/userAPI";
 import { userReducer } from "./reducer/userReducer";
-import { cartReducer } from "./reducer/cartReducer";
+import { CART_STORAGE_KEY, cartReducer } from "./reducer/cartReducer";
 import { orderApi } from "./api/orderAPI";
 import { dashboardApi } from "./api/dashboardAPI";
 
@@ -27,3 +27,16 @@ export const store = configureStore({
 });
 
 export type RootState = ReturnType<typeof store.getState>;
+
+// Save the cart whenever it changes
+let lastCart = store.getState().cartReducer;
+store.subscribe(() => {
+  const cart = store.getState().cartReducer;
+  if (cart === lastCart) return;
+  lastCart = cart;
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  } catch {
+    // storage full / blocked - cart just won't persist
+  }
+});

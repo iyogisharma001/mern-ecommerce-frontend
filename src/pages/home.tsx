@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
@@ -117,7 +118,7 @@ const services = [
   {
     icon: <TbTruckDelivery />,
     title: "FREE AND FAST DELIVERY",
-    description: "Free delivery for all orders over $200",
+    description: "Free delivery for all orders over ₹1000",
   },
   {
     icon: <LuShieldCheck />,
@@ -142,7 +143,9 @@ const Home = () => {
     toast.success("Added to cart");
   };
 
-  if (isError) toast.error("Cannot Fetch the Products");
+  useEffect(() => {
+    if (isError) toast.error("Cannot Fetch the Products");
+  }, [isError]);
 
   const coverMessage =
     "Fashion isn't just clothes; it's a vibrant language. Silhouettes and textures speak volumes, a conversation starter with every bold print. It's a way to tell our story, a confidence booster, or a playful exploration. From elegance to rebellion, fashion lets us navigate the world in style.".split(
@@ -246,7 +249,7 @@ const Home = () => {
 
       <article className="our-clients">
         <div>
-          <h2>Our Clients</h2>
+          <h2>Built With</h2>
           <div>
             {clients.map((client, i) => (
               <motion.img
@@ -279,7 +282,7 @@ const Home = () => {
               },
             }}
           >
-            Trusted By 100+ Companies in 30+ countries
+            React, Node, MongoDB, Redis and more
           </motion.p>
         </div>
       </article>
@@ -308,8 +311,8 @@ const Home = () => {
             >
               <div>{service.icon}</div>
               <section>
-                <h3>{service.title}Y</h3>
-                <p>{service.title}</p>
+                <h3>{service.title}</h3>
+                <p>{service.description}</p>
               </section>
             </motion.li>
           ))}

@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
@@ -21,16 +21,6 @@ const Login = () => {
       const provider = new GoogleAuthProvider();
       const { user } = await signInWithPopup(auth, provider);
 
-      console.log({
-        name: user.displayName!,
-        email: user.email!,
-        photo: user.photoURL!,
-        gender,
-        role: "user",
-        dob: date,
-        _id: user.uid,
-      });
-
       const res = await login({
         name: user.displayName!,
         email: user.email!,
@@ -49,10 +39,16 @@ const Login = () => {
         const error = res.error as FetchBaseQueryError;
         const message = (error.data as MessageResponse).message;
         toast.error(message);
+        // Don't leave the user signed into Firebase without a DB account
+        await signOut(auth);
         dispatch(userNotExist());
       }
     } catch (error) {
       toast.error("Sign In Fail");
+      // Any failure after the Google popup (network, getUser) must not leave
+      // the user signed into Firebase without a DB account
+      await signOut(auth).catch(() => {});
+      dispatch(userNotExist());
     }
   };
 

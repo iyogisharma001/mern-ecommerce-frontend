@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { CartReducerInitialState } from "../../types/reducer-types";
 import { CartItem, ShippingInfo } from "../../types/types";
 
-const initialState: CartReducerInitialState = {
+const emptyCart: CartReducerInitialState = {
   loading: false,
   cartItems: [],
   subtotal: 0,
@@ -19,6 +19,21 @@ const initialState: CartReducerInitialState = {
     pinCode: "",
   },
 };
+
+export const CART_STORAGE_KEY = "cart";
+
+// Restore the cart saved in localStorage (it used to vanish on refresh)
+const loadCart = (): CartReducerInitialState => {
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    if (!saved) return emptyCart;
+    return { ...emptyCart, ...JSON.parse(saved), loading: false };
+  } catch {
+    return emptyCart;
+  }
+};
+
+const initialState: CartReducerInitialState = loadCart();
 
 export const cartReducer = createSlice({
   name: "cartReducer",
@@ -53,6 +68,8 @@ export const cartReducer = createSlice({
       state.subtotal = subtotal;
       state.shippingCharges = state.subtotal > 1000 ? 0 : 200;
       state.tax = Math.round(state.subtotal * 0.18);
+      // Same rule as the server: a coupon can't be worth more than the subtotal
+      state.discount = Math.min(state.discount, state.subtotal);
       state.total =
         state.subtotal + state.tax + state.shippingCharges - state.discount;
     },
@@ -67,7 +84,8 @@ export const cartReducer = createSlice({
     saveShippingInfo: (state, action: PayloadAction<ShippingInfo>) => {
       state.shippingInfo = action.payload;
     },
-    resetCart: () => initialState,
+    // must return the EMPTY cart, not the one loaded from storage
+    resetCart: () => emptyCart,
   },
 });
 

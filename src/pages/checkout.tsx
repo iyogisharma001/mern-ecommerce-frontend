@@ -7,36 +7,20 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useNewOrderMutation } from "../redux/api/orderAPI";
 import { resetCart } from "../redux/reducer/cartReducer";
-import { RootState } from "../redux/store";
-import { NewOrderRequest } from "../types/api-types";
 import { responseToast } from "../utils/features";
 
-const stripeKey =
-  "pk_test_51OHpE1SEOz14slwcBOcGOweicHk9XITWgND9NAvr7ZJXIYdUiNyOHQtrbCsdQTLQqVAgDNeaDpPshuIO1PnHthtq00AJdf3gtG";
-
-const stripePromise = loadStripe(stripeKey);
+// Read from .env (was hard-coded to someone else's Stripe account)
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY);
 
 const CheckOutForm = () => {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-
-  const { user } = useSelector((state: RootState) => state.userReducer);
-
-  const {
-    shippingInfo,
-    cartItems,
-    subtotal,
-    tax,
-    discount,
-    shippingCharges,
-    total,
-  } = useSelector((state: RootState) => state.cartReducer);
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
@@ -48,20 +32,11 @@ const CheckOutForm = () => {
     if (!stripe || !elements) return;
     setIsProcessing(true);
 
-    const orderData: NewOrderRequest = {
-      shippingInfo,
-      orderItems: cartItems,
-      subtotal,
-      tax,
-      discount,
-      shippingCharges,
-      total,
-      user: user?._id!,
-    };
-
     const { paymentIntent, error } = await stripe.confirmPayment({
       elements,
-      confirmParams: { return_url: window.location.origin },
+      // If the bank needs a redirect (3-D Secure), Stripe comes back to
+      // /orders?payment_intent=... and the Orders page confirms the order
+      confirmParams: { return_url: `${window.location.origin}/orders` },
       redirect: "if_required",
     });
 
@@ -71,9 +46,19 @@ const CheckOutForm = () => {
     }
 
     if (paymentIntent.status === "succeeded") {
-      const res = await newOrder(orderData);
-      dispatch(resetCart());
-      responseToast(res, navigate, "/orders");
+      // Server verifies the payment with Stripe and builds the order itself
+      const res = await newOrder({ paymentIntentId: paymentIntent.id });
+
+      if ("data" in res) {
+        dispatch(resetCart());
+        responseToast(res, navigate, "/orders");
+      } else {
+        // Money was taken - don't clear the cart silently; the webhook
+        // will still create the order if this call failed
+        toast.error(
+          "Payment received, but we couldn't confirm the order yet. Check My Orders in a minute."
+        );
+      }
     }
     setIsProcessing(false);
   };

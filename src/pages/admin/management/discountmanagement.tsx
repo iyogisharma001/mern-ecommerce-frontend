@@ -1,32 +1,30 @@
-import { useFetchData } from "6pp";
 import axios from "axios";
 import { FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { FaTrash } from "react-icons/fa6";
-import { useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminSidebar from "../../../components/admin/AdminSidebar";
 import { Skeleton } from "../../../components/loader";
-import { RootState, server } from "../../../redux/store";
+import { server } from "../../../redux/store";
 import { SingleDiscountResponse } from "../../../types/api-types";
+import { useAuthFetch } from "../../../utils/useAuthFetch";
 
 const DiscountManagement = () => {
-  const { user } = useSelector((state: RootState) => state.userReducer);
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // no ?id= on any coupon URL: the admin is identified by the Bearer token
+  const couponURL = `${server}/api/v1/payment/coupon/${id}`;
 
   const {
     loading: isLoading,
     data,
     error,
-  } = useFetchData<SingleDiscountResponse>(
-    `${server}/api/v1/payment/coupon/${id}?id=${user?._id}`,
-    "discount-code"
-  );
+  } = useAuthFetch<SingleDiscountResponse>(couponURL);
 
-  if (error) {
-    toast.error(error);
-  }
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
 
   const [btnLoading, setBtnLoading] = useState<boolean>(false);
 
@@ -41,7 +39,7 @@ const DiscountManagement = () => {
 
     try {
       const { data } = await axios.put(
-        `${server}/api/v1/payment/coupon/${id}?id=${user?._id}`,
+        couponURL,
         {
           code,
           amount,
@@ -61,7 +59,10 @@ const DiscountManagement = () => {
         navigate("/admin/discount");
       }
     } catch (error) {
-      console.log(error);
+      toast.error(
+        (axios.isAxiosError(error) && error.response?.data?.message) ||
+          "Something went wrong"
+      );
     } finally {
       setBtnLoading(false);
     }
@@ -79,7 +80,7 @@ const DiscountManagement = () => {
 
     try {
       const { data } = await axios.delete(
-        `${server}/api/v1/payment/coupon/${id}?id=${user?._id}`,
+        couponURL,
         {
           withCredentials: true,
         }
@@ -90,7 +91,10 @@ const DiscountManagement = () => {
         navigate("/admin/discount");
       }
     } catch (error) {
-      console.log(error);
+      toast.error(
+        (axios.isAxiosError(error) && error.response?.data?.message) ||
+          "Something went wrong"
+      );
     } finally {
       setBtnLoading(false);
     }

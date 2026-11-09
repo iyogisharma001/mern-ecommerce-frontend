@@ -1,13 +1,11 @@
 import axios from "axios";
 import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
-import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../components/admin/AdminSidebar";
-import { RootState, server } from "../../../redux/store";
+import { server } from "../../../redux/store";
 
 const NewDiscount = () => {
-  const { user } = useSelector((state: RootState) => state.userReducer);
   const navigate = useNavigate();
 
   const [btnLoading, setBtnLoading] = useState<boolean>(false);
@@ -23,7 +21,8 @@ const NewDiscount = () => {
 
     try {
       const { data } = await axios.post(
-        `${server}/api/v1/payment/coupon/new?id=${user?._id}`,
+        // no ?id=: the admin is identified by the Bearer token
+        `${server}/api/v1/payment/coupon/new`,
         {
           code,
           amount,
@@ -43,7 +42,10 @@ const NewDiscount = () => {
         navigate("/admin/discount");
       }
     } catch (error) {
-      console.log(error);
+      toast.error(
+        (axios.isAxiosError(error) && error.response?.data?.message) ||
+          "Something went wrong"
+      );
     } finally {
       setBtnLoading(false);
     }
