@@ -36,3 +36,6 @@ Clone the backend repository and install dependencies:
 git clone [https://github.com/iyogisharma001/mern-ecommerce-backend.git](https://github.com/iyogisharma001/mern-ecommerce-backend.git)
 cd mern-ecommerce-backend
 npm install
+## Deployment
+
+The frontend runs on **Vercel** (`vercel.json` sends every route to the React app) and the backend on **Render**. Follow the step-by-step guide in the backend repo: [DEPLOY.md](https://github.com/iyogisharma001/mern-ecommerce-backend/blob/main/DEPLOY.md).
