@@ -153,10 +153,10 @@ const ProductDetails = () => {
                 <button
                   onClick={() =>
                     addToCartHandler({
-                      productId: data?.product?._id!,
-                      name: data?.product?.name!,
-                      price: data?.product?.price!,
-                      stock: data?.product?.stock!,
+                      productId: data?.product?._id ?? "",
+                      name: data?.product?.name ?? "",
+                      price: data?.product?.price ?? 0,
+                      stock: data?.product?.stock ?? 0,
                       quantity,
                       photo: data?.product?.photos[0].url || "",
                     })

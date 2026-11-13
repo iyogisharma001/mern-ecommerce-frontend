@@ -67,7 +67,7 @@ const Shipping = () => {
 
   useEffect(() => {
     if (cartItems.length <= 0) return navigate("/cart");
-  }, [cartItems]);
+  }, [cartItems, navigate]);
 
   return (
     <div className="shipping">

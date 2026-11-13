@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars --
+   react-table's official type template: the `any` defaults and the unused `V`
+   generic must match react-table's own declarations for interface merging */
 import {
   UseColumnOrderInstanceProps,
   UseColumnOrderState,
