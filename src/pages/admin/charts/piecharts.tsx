@@ -5,18 +5,21 @@ import { DoughnutChart, PieChart } from "../../../components/admin/Charts";
 import { Skeleton } from "../../../components/loader";
 import { usePieQuery } from "../../../redux/api/dashboardAPI";
 import { RootState } from "../../../redux/store";
+import { PieResponse } from "../../../types/api-types";
 
 const PieCharts = () => {
   const { user } = useSelector((state: RootState) => state.userReducer);
 
-  const { isLoading, data, isError } = usePieQuery(user?._id!);
+  const { isLoading, data, isError } = usePieQuery(user?._id ?? "");
 
-  const order = data?.charts.orderFullfillment!;
-  const categories = data?.charts.productCategories!;
-  const stock = data?.charts.stockAvailablity!;
-  const revenue = data?.charts.revenueDistribution!;
-  const ageGroup = data?.charts.usersAgeGroup!;
-  const adminCustomer = data?.charts.adminCustomer!;
+  // Only read inside the !isLoading branch below, when data is loaded
+  const charts = (data?.charts ?? {}) as PieResponse["charts"];
+  const order = charts.orderFullfillment;
+  const categories = charts.productCategories;
+  const stock = charts.stockAvailablity;
+  const revenue = charts.revenueDistribution;
+  const ageGroup = charts.usersAgeGroup;
+  const adminCustomer = charts.adminCustomer;
 
   if (isError) return <Navigate to={"/admin/dashboard"} />;
 

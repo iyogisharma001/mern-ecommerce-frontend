@@ -11,6 +11,7 @@ import { Skeleton } from "../../components/loader";
 import { useStatsQuery } from "../../redux/api/dashboardAPI";
 import { RootState } from "../../redux/store";
 import { getLastMonths } from "../../utils/features";
+import { StatsResponse } from "../../types/api-types";
 
 const userImg =
   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJxA5cTf-5dh5Eusm0puHbvAhOrCRPtckzjA&usqp";
@@ -20,9 +21,10 @@ const { last6Months: months } = getLastMonths();
 const Dashboard = () => {
   const { user } = useSelector((state: RootState) => state.userReducer);
 
-  const { isLoading, data, isError } = useStatsQuery(user?._id!);
+  const { isLoading, data, isError } = useStatsQuery(user?._id ?? "");
 
-  const stats = data?.stats!;
+  // Only read inside the !isLoading branch below, when data is loaded
+  const stats = data?.stats as StatsResponse["stats"];
 
   if (isError) return <Navigate to={"/"} />;
 

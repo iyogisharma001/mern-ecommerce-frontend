@@ -50,7 +50,7 @@ const Orders = () => {
   const { user } = useSelector((state: RootState) => state.userReducer);
   const dispatch = useDispatch();
 
-  const { isLoading, data, isError, error } = useMyOrdersQuery(user?._id!);
+  const { isLoading, data, isError, error } = useMyOrdersQuery(user?._id ?? "");
   const [newOrder] = useNewOrderMutation();
 
   const [rows, setRows] = useState<DataType[]>([]);
