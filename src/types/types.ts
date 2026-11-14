@@ -67,6 +67,7 @@ export type Order = {
     _id: string;
   };
   _id: string;
+  createdAt?: string;
 };
 
 type CountAndChange = {

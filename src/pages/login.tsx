@@ -1,87 +1,156 @@
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { useState } from "react";
+import { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import axios from "axios";
+import { GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from "firebase/auth";
+import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
+import { FiLock, FiPackage, FiTruck } from "react-icons/fi";
+import { useDispatch, useSelector } from "react-redux";
+import { Navigate, useLocation } from "react-router-dom";
+import { LogoMark } from "../components/logo";
+import { STORE } from "../config";
 import { auth } from "../firebase";
 import { getUser, useLoginMutation } from "../redux/api/userAPI";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
-import { MessageResponse } from "../types/api-types";
 import { userExist, userNotExist } from "../redux/reducer/userReducer";
-import { useDispatch } from "react-redux";
+import { RootState } from "../redux/store";
+import { MessageResponse } from "../types/api-types";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
+
+const today = new Date().toISOString().slice(0, 10);
 
 const Login = () => {
+  useDocumentTitle("Sign in");
   const dispatch = useDispatch();
-  const [gender, setGender] = useState("");
-  const [date, setDate] = useState("");
-
+  const location = useLocation();
+  const { user } = useSelector((state: RootState) => state.userReducer);
   const [login] = useLoginMutation();
 
-  const loginHandler = async () => {
+  const [busy, setBusy] = useState(false);
+  // Set when Google sign-in worked but this person has no account with us yet
+  const [newUser, setNewUser] = useState<FirebaseUser | null>(null);
+  const [gender, setGender] = useState("");
+  const [dob, setDob] = useState("");
+
+  // Back to where the customer was going (e.g. checkout), or home
+  const from = (location.state as { from?: string } | null)?.from || "/";
+  if (user) return <Navigate to={from} replace />;
+
+  const fail = async (message: string) => {
+    toast.error(message);
+    // Never leave someone signed in to Firebase without an account here
+    await signOut(auth).catch(() => {});
+    dispatch(userNotExist());
+    setNewUser(null);
+  };
+
+  const continueWithGoogle = async () => {
+    setBusy(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const { user } = await signInWithPopup(auth, provider);
-
-      const res = await login({
-        name: user.displayName!,
-        email: user.email!,
-        photo: user.photoURL!,
-        gender,
-        role: "user",
-        dob: date,
-        _id: user.uid,
-      });
-
-      if ("data" in res) {
-        toast.success(res.data.message);
-        const data = await getUser(user.uid);
+      const { user: fbUser } = await signInWithPopup(auth, new GoogleAuthProvider());
+      try {
+        // Returning customer: one click and done
+        const data = await getUser(fbUser.uid);
         dispatch(userExist(data.user));
-      } else {
-        const error = res.error as FetchBaseQueryError;
-        const message = (error.data as MessageResponse).message;
-        toast.error(message);
-        // Don't leave the user signed into Firebase without a DB account
-        await signOut(auth);
-        dispatch(userNotExist());
+        toast.success(`Welcome back, ${data.user.name.split(" ")[0]}!`);
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) setNewUser(fbUser);
+        else await fail("Could not sign you in. Please try again.");
       }
-    } catch (error) {
-      toast.error("Sign In Fail");
-      // Any failure after the Google popup (network, getUser) must not leave
-      // the user signed into Firebase without a DB account
-      await signOut(auth).catch(() => {});
-      dispatch(userNotExist());
+    } catch (err) {
+      // Closing the Google popup is not an error worth shouting about
+      const code = (err as { code?: string }).code;
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request")
+        toast.error("Google sign-in failed. Please try again.");
+    } finally {
+      setBusy(false);
     }
   };
 
+  const createAccount = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newUser) return;
+    setBusy(true);
+    const res = await login({
+      name: newUser.displayName || "",
+      email: newUser.email || "",
+      photo: newUser.photoURL || "",
+      gender,
+      role: "user",
+      dob,
+      _id: newUser.uid,
+    });
+
+    if ("data" in res) {
+      try {
+        const data = await getUser(newUser.uid);
+        dispatch(userExist(data.user));
+        toast.success(`Welcome to ${STORE.name}!`);
+      } catch {
+        await fail("Account created, but we couldn't sign you in. Please try again.");
+      }
+    } else {
+      const message = ((res.error as FetchBaseQueryError).data as MessageResponse)?.message;
+      await fail(message || "Could not create your account.");
+    }
+    setBusy(false);
+  };
+
   return (
-    <div className="login">
-      <main>
-        <h1 className="heading">Login</h1>
+    <div className="auth-page">
+      <div className="auth-card card">
+        <aside className="auth-aside">
+          <LogoMark />
+          <h2>{STORE.name}</h2>
+          <p>{STORE.tagline}</p>
+          <ul>
+            <li><FiTruck /> Free delivery on orders over ₹1,000</li>
+            <li><FiPackage /> Track every order in one place</li>
+            <li><FiLock /> Secure payments by Stripe</li>
+          </ul>
+        </aside>
 
-        <div>
-          <label>Gender</label>
-          <select value={gender} onChange={(e) => setGender(e.target.value)}>
-            <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </div>
+        <div className="auth-main">
+          {newUser ? (
+            <form onSubmit={createAccount} className="auth-form">
+              <h1>Almost there, {newUser.displayName?.split(" ")[0] || "friend"}</h1>
+              <p className="text-muted">Tell us a little about you to finish creating your account.</p>
 
-        <div>
-          <label>Date of birth</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+              <div className="field">
+                <label htmlFor="gender">Gender</label>
+                <select id="gender" className="input" required value={gender} onChange={(e) => setGender(e.target.value)}>
+                  <option value="">Select</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
 
-        <div>
-          <p>Already Signed In Once</p>
-          <button onClick={loginHandler}>
-            <FcGoogle /> <span>Sign in with Google</span>
-          </button>
+              <div className="field">
+                <label htmlFor="dob">Date of birth</label>
+                <input id="dob" type="date" className="input" required max={today}
+                  value={dob} onChange={(e) => setDob(e.target.value)} />
+              </div>
+
+              <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
+                {busy ? "Creating account…" : "Create account"}
+              </button>
+              <button type="button" className="btn btn-ghost btn-block" onClick={() => fail("Sign-up cancelled")}>
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <div className="auth-form">
+              <h1>Welcome</h1>
+              <p className="text-muted">Sign in or create an account to check out and track your orders.</p>
+              <button className="btn btn-outline btn-lg btn-block google-btn" onClick={continueWithGoogle} disabled={busy}>
+                <FcGoogle /> {busy ? "Signing in…" : "Continue with Google"}
+              </button>
+              <small className="text-muted">
+                We only use your Google name, email and photo for your {STORE.name} account.
+              </small>
+            </div>
+          )}
         </div>
-      </main>
+      </div>
     </div>
   );
 };

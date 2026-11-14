@@ -1,324 +1,172 @@
 import { useEffect } from "react";
 import toast from "react-hot-toast";
-import { useDispatch } from "react-redux";
+import { IconType } from "react-icons";
+import { FaGlasses } from "react-icons/fa6";
+import {
+  FiArrowRight,
+  FiLock,
+  FiPackage,
+  FiShoppingBag,
+  FiSmartphone,
+  FiTruck,
+  FiWatch,
+} from "react-icons/fi";
+import { GiConverseShoe } from "react-icons/gi";
+import { MdLaptopMac } from "react-icons/md";
+import { RiGoogleFill } from "react-icons/ri";
 import { Link } from "react-router-dom";
-import { Skeleton } from "../components/loader";
-import ProductCard from "../components/product-card";
-import { useLatestProductsQuery } from "../redux/api/productAPI";
-import { addToCart } from "../redux/reducer/cartReducer";
-import { CartItem } from "../types/types";
-import videoCover from "../assets/videos/cover.mp4";
-import { FaAnglesDown, FaHeadset } from "react-icons/fa6";
-import { motion } from "framer-motion";
-import { Slider } from "6pp";
-import { TbTruckDelivery } from "react-icons/tb";
-import { LuShieldCheck } from "react-icons/lu";
+import ProductCard, { ProductCardSkeleton } from "../components/product-card";
+import { PRICING, STORE } from "../config";
+import { useCategoriesQuery, useLatestProductsQuery } from "../redux/api/productAPI";
+import { formatPrice, titleCase, transformImage } from "../utils/features";
+import { useAddToCart } from "../utils/useAddToCart";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
 
-const clients = [
-  {
-    src: "https://www.vectorlogo.zone/logos/reactjs/reactjs-ar21.svg",
-    alt: "react",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/nodejs/nodejs-ar21.svg",
-    alt: "node",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/mongodb/mongodb-ar21.svg",
-    alt: "mongodb",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/expressjs/expressjs-ar21.svg",
-    alt: "express",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/js_redux/js_redux-ar21.svg",
-    alt: "redux",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/typescriptlang/typescriptlang-ar21.svg",
-    alt: "typescript",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/sass-lang/sass-lang-ar21.svg",
-    alt: "sass",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/firebase/firebase-ar21.svg",
-    alt: "firebase",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/figma/figma-ar21.svg",
-    alt: "figma",
-  },
+const CATEGORY_ICONS: Record<string, IconType> = {
+  smartphones: FiSmartphone,
+  laptops: MdLaptopMac,
+  watches: FiWatch,
+  shoes: GiConverseShoe,
+  bags: FiShoppingBag,
+  sunglasses: FaGlasses,
+};
 
+// Only promises the app actually keeps
+const PERKS = [
   {
-    src: "https://www.vectorlogo.zone/logos/github/github-ar21.svg",
-    alt: "github",
+    icon: FiTruck,
+    title: "Free delivery",
+    text: `On every order over ${formatPrice(PRICING.freeShippingAbove)}`,
   },
-
-  {
-    src: "https://www.vectorlogo.zone/logos/docker/docker-ar21.svg",
-    alt: "Docker",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/kubernetes/kubernetes-ar21.svg",
-    alt: "Kubernetes",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/nestjs/nestjs-ar21.svg",
-    alt: "Nest.js",
-  },
-
-  {
-    src: "https://www.vectorlogo.zone/logos/graphql/graphql-ar21.svg",
-    alt: "GraphQL",
-  },
-
-  {
-    src: "https://www.vectorlogo.zone/logos/jestjsio/jestjsio-ar21.svg",
-    alt: "Jest",
-  },
-
-  {
-    src: "https://www.vectorlogo.zone/logos/redis/redis-ar21.svg",
-    alt: "Redis",
-  },
-
-  {
-    src: "https://www.vectorlogo.zone/logos/postgresql/postgresql-ar21.svg",
-    alt: "PostgreSQL",
-  },
-  {
-    src: "https://www.vectorlogo.zone/logos/jenkins/jenkins-ar21.svg",
-    alt: "Jenkins",
-  },
-];
-
-const banners = [
-  "https://res.cloudinary.com/dj5q966nb/image/upload/v1719253445/rmbjpuzctjdbtt8hewaz.png",
-  "https://res.cloudinary.com/dj5q966nb/image/upload/v1719253433/ticeufjqvf6napjhdiee.png",
-];
-const categories = [
-  "Electronics",
-  "Mobiles",
-  "Laptops",
-  "Books",
-  "Fashion",
-  "Appliances",
-  "Furniture",
-  "Home Decor",
-  "Grocery",
-  "Beauty",
-  "Toys",
-  "Fitness",
-];
-
-const services = [
-  {
-    icon: <TbTruckDelivery />,
-    title: "FREE AND FAST DELIVERY",
-    description: "Free delivery for all orders over ₹1000",
-  },
-  {
-    icon: <LuShieldCheck />,
-    title: "SECURE PAYMENT",
-    description: "100% secure payment",
-  },
-  {
-    icon: <FaHeadset />,
-    title: "24/7 SUPPORT",
-    description: "Get support 24/7",
-  },
+  { icon: FiLock, title: "Secure checkout", text: "Card payments processed by Stripe" },
+  { icon: FiPackage, title: "Order tracking", text: "Follow every order from packing to doorstep" },
+  { icon: RiGoogleFill, title: "One-tap sign in", text: "Sign in with your Google account" },
 ];
 
 const Home = () => {
-  const { data, isError, isLoading } = useLatestProductsQuery("");
-
-  const dispatch = useDispatch();
-
-  const addToCartHandler = (cartItem: CartItem) => {
-    if (cartItem.stock < 1) return toast.error("Out of Stock");
-    dispatch(addToCart(cartItem));
-    toast.success("Added to cart");
-  };
+  useDocumentTitle();
+  const addToCart = useAddToCart();
+  const latest = useLatestProductsQuery("");
+  const categories = useCategoriesQuery("");
 
   useEffect(() => {
-    if (isError) toast.error("Cannot Fetch the Products");
-  }, [isError]);
+    if (latest.isError) toast.error("Could not load products. Please refresh the page.");
+  }, [latest.isError]);
 
-  const coverMessage =
-    "Fashion isn't just clothes; it's a vibrant language. Silhouettes and textures speak volumes, a conversation starter with every bold print. It's a way to tell our story, a confidence booster, or a playful exploration. From elegance to rebellion, fashion lets us navigate the world in style.".split(
-      " "
-    );
+  const products = latest.data?.products || [];
+  // Showcase 3 new products from different categories, tech first
+  const HERO_ORDER = ["smartphones", "laptops", "watches"];
+  const rank = (category: string) => {
+    const i = HERO_ORDER.indexOf(category);
+    return i === -1 ? HERO_ORDER.length : i;
+  };
+  const heroProducts = products
+    .filter((p, i, all) => all.findIndex((q) => q.category === p.category) === i)
+    .sort((a, b) => rank(a.category) - rank(b.category))
+    .slice(0, 3);
 
   return (
-    <>
-      <div className="home">
-        <section></section>
-
-        <div>
-          <aside>
-            <h1>Categories</h1>
-            <ul>
-              {categories.map((i) => (
-                <li key={i}>
-                  <Link to={`/search?category=${i.toLowerCase()}`}>{i}</Link>
-                </li>
-              ))}
-            </ul>
-          </aside>
-          <Slider
-            autoplay
-            autoplayDuration={1500}
-            showNav={false}
-            images={banners}
-          />
-        </div>
-
-        <h1>
-          Latest Products
-          <Link to="/search" className="findmore">
-            More
-          </Link>
-        </h1>
-
-        <main>
-          {isLoading ? (
-            <>
-              {Array.from({ length: 6 }, (_, i) => (
-                <div key={i} style={{ height: "25rem" }}>
-                  <Skeleton width="18.75rem" length={1} height="20rem" />
-                  <Skeleton width="18.75rem" length={2} height="1.95rem" />
-                </div>
-              ))}
-            </>
-          ) : (
-            data?.products.map((i) => (
-              <ProductCard
-                key={i._id}
-                productId={i._id}
-                name={i.name}
-                price={i.price}
-                stock={i.stock}
-                handler={addToCartHandler}
-                photos={i.photos}
-              />
-            ))
-          )}
-        </main>
-      </div>
-
-      <article className="cover-video-container">
-        <div className="cover-video-overlay"></div>
-        <video autoPlay loop muted src={videoCover} />
-        <div className="cover-video-content">
-          <motion.h2
-            initial={{ x: -100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            Fashion
-          </motion.h2>
-          {coverMessage.map((el, i) => (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{
-                duration: 0.25,
-                delay: i / 10,
-              }}
-              key={i}
-            >
-              {el}{" "}
-            </motion.span>
-          ))}
-        </div>
-        <motion.span
-          animate={{
-            y: [0, 10, 0],
-            transition: {
-              duration: 1,
-              repeat: Infinity,
-            },
-          }}
-        >
-          <FaAnglesDown />
-        </motion.span>
-      </article>
-
-      <article className="our-clients">
-        <div>
-          <h2>Built With</h2>
-          <div>
-            {clients.map((client, i) => (
-              <motion.img
-                initial={{
-                  opacity: 0,
-                  x: -10,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  x: 0,
-                  transition: {
-                    delay: i / 20,
-                    ease: "circIn",
-                  },
-                }}
-                src={client.src}
-                alt={client.alt}
-                key={i}
-              />
-            ))}
+    <div className="home">
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="badge badge-primary">New arrivals every week</span>
+          <h1>
+            The tech and style you love, <span>delivered.</span>
+          </h1>
+          <p>
+            Shop phones, laptops, watches and accessories from top brands. Free delivery over{" "}
+            {formatPrice(PRICING.freeShippingAbove)} and secure checkout on every order.
+          </p>
+          <div className="hero-actions">
+            <Link to="/search" className="btn btn-primary btn-lg">
+              Shop now <FiArrowRight />
+            </Link>
+            <a href="#categories" className="btn btn-outline btn-lg">
+              Browse categories
+            </a>
           </div>
-
-          <motion.p
-            initial={{ opacity: 0, y: -100 }}
-            whileInView={{
-              opacity: 1,
-              y: 0,
-              transition: {
-                delay: clients.length / 20,
-              },
-            }}
-          >
-            React, Node, MongoDB, Redis and more
-          </motion.p>
         </div>
-      </article>
 
-      <hr
-        style={{
-          backgroundColor: "rgba(0,0,0,0.1)",
-          border: "none",
-          height: "1px",
-        }}
-      />
-
-      <article className="our-services">
-        <ul>
-          {services.map((service, i) => (
-            <motion.li
-              initial={{ opacity: 0, y: -100 }}
-              whileInView={{
-                opacity: 1,
-                y: 0,
-                transition: {
-                  delay: i / 20,
-                },
-              }}
-              key={service.title}
-            >
-              <div>{service.icon}</div>
-              <section>
-                <h3>{service.title}</h3>
-                <p>{service.description}</p>
-              </section>
-            </motion.li>
+        <div className="hero-visual" aria-hidden={heroProducts.length === 0}>
+          {latest.isLoading &&
+            [0, 1, 2].map((i) => <div key={i} className={`hero-tile tile-${i} skeleton-block`} />)}
+          {heroProducts.map((p, i) => (
+            <Link key={p._id} to={`/product/${p._id}`} className={`hero-tile tile-${i}`}>
+              <img src={transformImage(p.photos[0]?.url, 500)} alt={p.name} />
+              <span>
+                <em>{p.name}</em>
+                <strong>{formatPrice(p.price)}</strong>
+              </span>
+            </Link>
           ))}
-        </ul>
-      </article>
-    </>
+        </div>
+      </section>
+
+      <section className="perks" aria-label="Why shop with us">
+        {PERKS.map(({ icon: Icon, title, text }) => (
+          <div key={title} className="perk">
+            <Icon />
+            <div>
+              <strong>{title}</strong>
+              <span>{text}</span>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section id="categories" className="section">
+        <div className="section-head">
+          <div>
+            <h2>Shop by category</h2>
+            <p className="text-muted">Find exactly what you are looking for</p>
+          </div>
+        </div>
+        <div className="category-grid">
+          {(categories.data?.categories || []).map((category) => {
+            const Icon = CATEGORY_ICONS[category] || FiShoppingBag;
+            return (
+              <Link key={category} to={`/search?category=${category}`} className="category-tile">
+                <span className="category-icon">
+                  <Icon />
+                </span>
+                {titleCase(category)}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <h2>New arrivals</h2>
+            <p className="text-muted">The latest additions to the {STORE.name} store</p>
+          </div>
+          <Link to="/search" className="link-arrow">
+            View all <FiArrowRight />
+          </Link>
+        </div>
+
+        <div className="product-grid">
+          {latest.isLoading
+            ? Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)
+            : products.map((p) => <ProductCard key={p._id} product={p} onAddToCart={addToCart} />)}
+        </div>
+        {!latest.isLoading && products.length === 0 && (
+          <p className="text-muted">New products are on their way. Check back soon.</p>
+        )}
+      </section>
+
+      <section className="promo">
+        <div>
+          <h2>Spend {formatPrice(PRICING.freeShippingAbove)}, ship for free</h2>
+          <p>Delivery is on us for every order above {formatPrice(PRICING.freeShippingAbove)}, anywhere in India.</p>
+        </div>
+        <Link to="/search" className="btn btn-lg promo-btn">
+          Start shopping <FiArrowRight />
+        </Link>
+      </section>
+    </div>
   );
 };
 

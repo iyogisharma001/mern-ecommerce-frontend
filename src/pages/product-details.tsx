@@ -1,228 +1,208 @@
-import { CarouselButtonType, MyntraCarousel, Slider, useRating } from "6pp";
-import { useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FaTrash } from "react-icons/fa";
-import {
-  FaArrowLeftLong,
-  FaArrowRightLong,
-  FaRegStar,
-  FaStar,
-} from "react-icons/fa6";
-import { FiEdit } from "react-icons/fi";
-import { useDispatch, useSelector } from "react-redux";
-import { Navigate, useParams } from "react-router-dom";
-import { Skeleton } from "../components/loader";
-import RatingsComponent from "../components/ratings";
+import { FiCheck, FiLock, FiMinus, FiPlus, FiShoppingBag, FiTrash2, FiTruck } from "react-icons/fi";
+import { useSelector } from "react-redux";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import ImageGallery from "../components/image-gallery";
+import Stars from "../components/ratings";
+import { PRICING } from "../config";
 import {
   useAllReviewsOfProductsQuery,
   useDeleteReviewMutation,
   useNewReviewMutation,
   useProductDetailsQuery,
 } from "../redux/api/productAPI";
-import { addToCart } from "../redux/reducer/cartReducer";
 import { RootState } from "../redux/store";
-import { CartItem, Review } from "../types/types";
-import { responseToast } from "../utils/features";
+import { Review } from "../types/types";
+import { formatDate, formatPrice, responseToast, titleCase } from "../utils/features";
+import { useAddToCart } from "../utils/useAddToCart";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
 
 const ProductDetails = () => {
-  const params = useParams();
-  const dispatch = useDispatch();
-
+  const { id = "" } = useParams();
+  const navigate = useNavigate();
+  const addToCart = useAddToCart();
   const { user } = useSelector((state: RootState) => state.userReducer);
 
-  const { isLoading, isError, data } = useProductDetailsQuery(params.id!);
-  const reviewsResponse = useAllReviewsOfProductsQuery(params.id!);
-  const [carouselOpen, setCarouselOpen] = useState(false);
-  const [quantity, setQuantity] = useState(1);
-
-  const [reviewComment, setReviewComment] = useState("");
-  const reviewDialogRef = useRef<HTMLDialogElement>(null);
-  const [reviewSubmitLoading, setReviewSubmitLoading] = useState(false);
-
-  const [createReview] = useNewReviewMutation();
+  const { data, isLoading, isError } = useProductDetailsQuery(id);
+  const reviews = useAllReviewsOfProductsQuery(id);
+  const [createReview, { isLoading: submitting }] = useNewReviewMutation();
   const [deleteReview] = useDeleteReviewMutation();
 
-  const decrement = () => setQuantity((prev) => Math.max(1, prev - 1));
-  const increment = () => {
-    if (data?.product?.stock === quantity)
-      return toast.error(`${data?.product?.stock} available only`);
-    setQuantity((prev) => prev + 1);
+  const [quantity, setQuantity] = useState(1);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+
+  const product = data?.product;
+  useDocumentTitle(product?.name);
+  useEffect(() => {
+    setQuantity(1);
+  }, [id]);
+
+  // All hooks above this line (rules of hooks)
+  if (isError) return <Navigate to="/404" replace />;
+  if (isLoading || !product) return <ProductSkeleton />;
+
+  const { name, price, stock, category, description, ratings, numOfReviews, photos } = product;
+  const cartItem = {
+    productId: product._id,
+    name,
+    price,
+    stock,
+    quantity,
+    photo: photos[0]?.url || "",
   };
 
-  const addToCartHandler = (cartItem: CartItem) => {
-    if (cartItem.stock < 1) return toast.error("Out of Stock");
+  const myReview = reviews.data?.reviews.find((r) => r.user?._id === user?._id);
 
-    dispatch(addToCart(cartItem));
-    toast.success("Added to cart");
-  };
-
-  const showDialog = () => {
-    reviewDialogRef.current?.showModal();
-  };
-
-  const {
-    Ratings: RatingsEditable,
-    rating,
-    setRating,
-  } = useRating({
-    IconFilled: <FaStar />,
-    IconOutline: <FaRegStar />,
-    value: 0,
-    selectable: true,
-    styles: {
-      fontSize: "1.75rem",
-      color: "coral",
-      justifyContent: "flex-start",
-    },
-  });
-
-  // Early return moved BELOW all hooks (it used to sit above useRating,
-  // which breaks React's rules of hooks and crashes the page)
-  if (isError) return <Navigate to="/404" />;
-
-  const reviewCloseHandler = () => {
-    reviewDialogRef.current?.close();
-    setRating(0);
-    setReviewComment("");
-  };
-
-  const submitReview = async (e: React.FormEvent<HTMLFormElement>) => {
+  const submitReview = async (e: FormEvent) => {
     e.preventDefault();
-    if (rating < 1) return toast.error("Please select a rating");
-    setReviewSubmitLoading(true);
-    reviewCloseHandler();
-
-    const res = await createReview({
-      comment: reviewComment,
-      rating,
-      userId: user?._id,
-      productId: params.id!,
-    });
-
-    setReviewSubmitLoading(false);
-
+    if (rating < 1) return toast.error("Please pick a star rating");
+    const res = await createReview({ comment: comment.trim(), rating, userId: user?._id, productId: id });
     responseToast(res, null, "");
-
-    // API call to submit review
+    if ("data" in res) {
+      setRating(0);
+      setComment("");
+    }
   };
 
-  const handleDeleteReview = async (reviewId: string) => {
+  const removeReview = async (reviewId: string) => {
     const res = await deleteReview({ reviewId, userId: user?._id });
     responseToast(res, null, "");
   };
 
   return (
-    <div className="product-details">
-      {isLoading ? (
-        <ProductLoader />
-      ) : (
-        <>
-          <main>
-            <section>
-              <Slider
-                showThumbnails
-                showNav={false}
-                onClick={() => setCarouselOpen(true)}
-                images={data?.product?.photos.map((i) => i.url) || []}
-              />
-              {carouselOpen && (
-                <MyntraCarousel
-                  NextButton={NextButton}
-                  PrevButton={PrevButton}
-                  setIsOpen={setCarouselOpen}
-                  images={data?.product?.photos.map((i) => i.url) || []}
-                />
-              )}
-            </section>
-            <section>
-              <code>{data?.product?.category}</code>
-              <h1>{data?.product?.name}</h1>
-              <em
-                style={{ display: "flex", gap: "1rem", alignItems: "center" }}
+    <div className="page product-page">
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link to="/">Home</Link>
+        <span>/</span>
+        <Link to={`/search?category=${category}`}>{titleCase(category)}</Link>
+        <span>/</span>
+        <span aria-current="page">{name}</span>
+      </nav>
+
+      <div className="product-layout">
+        <ImageGallery images={photos.map((p) => p.url)} alt={name} />
+
+        <div className="product-info">
+          <span className="badge">{titleCase(category)}</span>
+          <h1>{name}</h1>
+
+          <a href="#reviews" className="product-rating">
+            <Stars value={ratings} />
+            <span>
+              {numOfReviews ? `${ratings.toFixed(1)} · ${numOfReviews} review${numOfReviews > 1 ? "s" : ""}` : "No reviews yet"}
+            </span>
+          </a>
+
+          <div className="product-price">
+            {formatPrice(price)}
+            <small>+ 18% GST at checkout</small>
+          </div>
+
+          <StockStatus stock={stock} />
+
+          {stock > 0 && (
+            <div className="product-buy">
+              <div className="qty" aria-label="Quantity">
+                <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} disabled={quantity <= 1} aria-label="Decrease quantity">
+                  <FiMinus />
+                </button>
+                <span>{quantity}</span>
+                <button onClick={() => setQuantity((q) => Math.min(stock, q + 1))} disabled={quantity >= stock} aria-label="Increase quantity">
+                  <FiPlus />
+                </button>
+              </div>
+              <button className="btn btn-outline btn-lg" onClick={() => addToCart(cartItem)}>
+                <FiShoppingBag /> Add to cart
+              </button>
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={() => {
+                  addToCart(cartItem);
+                  navigate("/cart");
+                }}
               >
-                <RatingsComponent value={data?.product?.ratings || 0} />(
-                {data?.product?.numOfReviews} reviews)
-              </em>
-              <h3>₹{data?.product?.price}</h3>
-              <article>
-                <div>
-                  <button onClick={decrement}>-</button>
-                  <span>{quantity}</span>
-                  <button onClick={increment}>+</button>
-                </div>
-                <button
-                  onClick={() =>
-                    addToCartHandler({
-                      productId: data?.product?._id ?? "",
-                      name: data?.product?.name ?? "",
-                      price: data?.product?.price ?? 0,
-                      stock: data?.product?.stock ?? 0,
-                      quantity,
-                      photo: data?.product?.photos[0].url || "",
-                    })
-                  }
-                >
-                  Add To Cart
-                </button>
-              </article>
+                Buy now
+              </button>
+            </div>
+          )}
 
-              <p>{data?.product?.description}</p>
-            </section>
-          </main>
-        </>
-      )}
+          <ul className="product-perks">
+            <li>
+              <FiTruck />
+              {price * quantity >= PRICING.freeShippingAbove
+                ? "Free delivery on this order"
+                : `Free delivery on orders over ${formatPrice(PRICING.freeShippingAbove)}`}
+            </li>
+            <li>
+              <FiLock /> Secure payment with Stripe
+            </li>
+          </ul>
 
-      <dialog ref={reviewDialogRef} className="review-dialog">
-        <button onClick={reviewCloseHandler}>X</button>
-        <h2>Write a Review</h2>
-        <form onSubmit={submitReview}>
-          <textarea
-            value={reviewComment}
-            onChange={(e) => setReviewComment(e.target.value)}
-            placeholder="Review..."
-          ></textarea>
-          <RatingsEditable />
-          <button disabled={reviewSubmitLoading} type="submit">
-            Submit
-          </button>
-        </form>
-      </dialog>
+          <div className="product-description">
+            <h2>About this product</h2>
+            <p>{description}</p>
+          </div>
+        </div>
+      </div>
 
-      <section>
-        <article>
-          <h2>Reviews</h2>
+      <section id="reviews" className="reviews">
+        <div className="reviews-summary card">
+          <h2>Customer reviews</h2>
+          <div className="reviews-score">
+            <strong>{numOfReviews ? ratings.toFixed(1) : "–"}</strong>
+            <div>
+              <Stars value={ratings} />
+              <span className="text-muted">
+                {numOfReviews} review{numOfReviews === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
 
-          {reviewsResponse.isLoading
-            ? null
-            : user && (
-                <button onClick={showDialog}>
-                  <FiEdit />
-                </button>
-              )}
-        </article>
-        <div
-          style={{
-            display: "flex",
-            gap: "2rem",
-            overflowX: "auto",
-            padding: "2rem",
-          }}
-        >
-          {reviewsResponse.isLoading ? (
-            <>
-              <Skeleton width="45rem" length={5} />
-              <Skeleton width="45rem" length={5} />
-              <Skeleton width="45rem" length={5} />
-            </>
+          {user ? (
+            <form className="review-form" onSubmit={submitReview}>
+              <h3>{myReview ? "Update your review" : "Write a review"}</h3>
+              <Stars value={rating} size="lg" onChange={setRating} />
+              <label className="sr-only" htmlFor="review-comment">
+                Your review
+              </label>
+              <textarea
+                id="review-comment"
+                className="input"
+                maxLength={200}
+                placeholder="What did you like or dislike?"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+              <button className="btn btn-dark" disabled={submitting}>
+                {submitting ? "Posting…" : "Post review"}
+              </button>
+            </form>
           ) : (
-            reviewsResponse.data?.reviews.map((review) => (
-              <ReviewCard
-                handleDeleteReview={handleDeleteReview}
-                userId={user?._id}
+            <p className="text-muted">
+              <Link to="/login" className="link">
+                Sign in
+              </Link>{" "}
+              to write a review.
+            </p>
+          )}
+        </div>
+
+        <div className="reviews-list">
+          {reviews.isLoading ? (
+            <p className="text-muted">Loading reviews…</p>
+          ) : reviews.data?.reviews.length ? (
+            reviews.data.reviews.map((review) => (
+              <ReviewItem
                 key={review._id}
                 review={review}
+                isMine={review.user?._id === user?._id}
+                onDelete={removeReview}
               />
             ))
+          ) : (
+            <p className="text-muted">No reviews yet. Be the first to share your thoughts.</p>
           )}
         </div>
       </section>
@@ -230,75 +210,62 @@ const ProductDetails = () => {
   );
 };
 
-const ReviewCard = ({
-  review,
-  userId,
-  handleDeleteReview,
-}: {
-  userId?: string;
-  review: Review;
-  handleDeleteReview: (reviewId: string) => void;
-}) => (
-  <div className="review">
-    <RatingsComponent value={review.rating} />
-    <p>{review.comment}</p>
-    <div>
-      <img src={review.user.photo} alt="User" />
-      <small>{review.user.name}</small>
-    </div>
-    {userId === review.user._id && (
-      <button onClick={() => handleDeleteReview(review._id)}>
-        <FaTrash />
-      </button>
-    )}
-  </div>
-);
-
-const ProductLoader = () => {
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: "2rem",
-        border: "1px solid #f1f1f1",
-        height: "80vh",
-      }}
-    >
-      <section style={{ width: "100%", height: "100%" }}>
-        <Skeleton
-          width="100%"
-          containerHeight="100%"
-          height="100%"
-          length={1}
-        />
-      </section>
-      <section
-        style={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          gap: "4rem",
-          padding: "2rem",
-        }}
-      >
-        <Skeleton width="40%" length={3} />
-        <Skeleton width="50%" length={4} />
-        <Skeleton width="100%" length={2} />
-        <Skeleton width="100%" length={10} />
-      </section>
-    </div>
+const StockStatus = ({ stock }: { stock: number }) =>
+  stock < 1 ? (
+    <span className="badge badge-danger">Out of stock</span>
+  ) : stock <= 5 ? (
+    <span className="badge badge-warning">Only {stock} left, order soon</span>
+  ) : (
+    <span className="badge badge-success">
+      <FiCheck /> In stock
+    </span>
   );
-};
 
-const NextButton: CarouselButtonType = ({ onClick }) => (
-  <button onClick={onClick} className="carousel-btn">
-    <FaArrowRightLong />
-  </button>
+type ReviewWithDate = Review & { updatedAt?: string };
+
+const ReviewItem = ({
+  review,
+  isMine,
+  onDelete,
+}: {
+  review: ReviewWithDate;
+  isMine: boolean;
+  onDelete: (id: string) => void;
+}) => (
+  <article className="review-item">
+    <div className="review-head">
+      {review.user?.photo ? (
+        <img src={review.user.photo} alt="" referrerPolicy="no-referrer" />
+      ) : (
+        <span className="review-avatar">{review.user?.name?.[0] || "?"}</span>
+      )}
+      <div>
+        <strong>{review.user?.name || "Former customer"}</strong>
+        <small className="text-muted">{formatDate(review.updatedAt)}</small>
+      </div>
+      {isMine && (
+        <button className="icon-btn" onClick={() => onDelete(review._id)} aria-label="Delete your review">
+          <FiTrash2 />
+        </button>
+      )}
+    </div>
+    <Stars value={review.rating} size="sm" />
+    {review.comment && <p>{review.comment}</p>}
+  </article>
 );
-const PrevButton: CarouselButtonType = ({ onClick }) => (
-  <button onClick={onClick} className="carousel-btn">
-    <FaArrowLeftLong />
-  </button>
+
+const ProductSkeleton = () => (
+  <div className="page product-page" aria-busy="true">
+    <div className="product-layout">
+      <div className="skeleton-block" style={{ aspectRatio: "1", borderRadius: 20 }} />
+      <div className="product-info">
+        <div className="skeleton-block line short" />
+        <div className="skeleton-block line" style={{ height: 32 }} />
+        <div className="skeleton-block line short" />
+        <div className="skeleton-block line" style={{ height: 120 }} />
+      </div>
+    </div>
+  </div>
 );
 
 export default ProductDetails;
