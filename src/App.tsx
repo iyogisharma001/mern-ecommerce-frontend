@@ -46,7 +46,8 @@ const Layout = ({ children }: { children: ReactNode }) => {
   const isAdmin = pathname.startsWith("/admin");
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // "instant": a new page should start at the top, not animate up to it
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
   if (isAdmin) return <>{children}</>;
