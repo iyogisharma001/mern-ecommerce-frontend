@@ -1,5 +1,5 @@
 import { ReactElement } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 interface Props {
   children?: ReactElement;
@@ -9,16 +9,14 @@ interface Props {
   redirect?: string;
 }
 
-const ProtectedRoute = ({
-  isAuthenticated,
-  children,
-  adminOnly,
-  admin,
-  redirect = "/",
-}: Props) => {
-  if (!isAuthenticated) return <Navigate to={redirect} />;
+const ProtectedRoute = ({ isAuthenticated, children, adminOnly, admin, redirect = "/" }: Props) => {
+  const location = useLocation();
 
-  if (adminOnly && !admin) return <Navigate to={redirect} />;
+  // Remember where the visitor was going, so login can send them back there
+  if (!isAuthenticated)
+    return <Navigate to={redirect} replace state={{ from: location.pathname + location.search }} />;
+
+  if (adminOnly && !admin) return <Navigate to="/" replace />;
 
   return children ? children : <Outlet />;
 };

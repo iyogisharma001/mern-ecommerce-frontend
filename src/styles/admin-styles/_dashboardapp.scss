@@ -6,58 +6,6 @@
     @include flex(column, center, center, 2rem);
     height: 100%;
 
-    .stopwatch {
-      > h2 {
-        font-size: 2rem;
-        font-weight: 300;
-        text-align: center;
-      }
-
-      > button {
-        padding: 1rem 2rem;
-        border: none;
-        cursor: pointer;
-        color: white;
-        margin: 2rem;
-        font-weight: 700;
-        border-radius: 10px;
-
-        &:first-of-type {
-          background-color: rgb(0, 98, 255);
-        }
-
-        &:last-of-type {
-          background-color: rgb(255, 0, 0);
-        }
-      }
-    }
-
-    .tosscoin {
-      margin: 2rem;
-      @include square(15rem);
-      position: relative;
-      cursor: pointer;
-      transform-style: preserve-3d;
-      transition: all 0.5s;
-      > div {
-        border-radius: 50%;
-        @include square(100%);
-        position: absolute;
-        display: grid;
-        place-items: center;
-        background-repeat: no-repeat;
-        background-size: contain;
-        backface-visibility: hidden;
-        filter: drop-shadow(0px 10px 10px rgba(0, 0, 0, 0.521));
-        &:first-of-type {
-          background-image: url("../assets/images/heads.png");
-        }
-        &:last-of-type {
-          background-image: url("../assets/images/tails.png");
-          transform: rotateY(-180deg);
-        }
-      }
-    }
 
     .coupon-form {
       @include grid(2fr 1fr, 2rem);

@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { AiFillFileText } from "react-icons/ai";
-import {
-  FaChartBar,
-  FaChartLine,
-  FaChartPie,
-  FaGamepad,
-  FaStopwatch,
-} from "react-icons/fa";
+import { FaChartBar, FaChartLine, FaChartPie } from "react-icons/fa";
+import { FiArrowLeft } from "react-icons/fi";
 import { HiMenuAlt4 } from "react-icons/hi";
 import { IoIosPeople } from "react-icons/io";
 import {
@@ -17,6 +12,7 @@ import {
 import { Link, Location, useLocation } from "react-router-dom";
 import { IconType } from "react-icons";
 import { MdDiscount } from "react-icons/md";
+import Logo from "../logo";
 
 const AdminSidebar = () => {
   const location = useLocation();
@@ -60,7 +56,12 @@ const AdminSidebar = () => {
             : {}
         }
       >
-        <h2>Logo.</h2>
+        <div className="admin-brand">
+          <Logo />
+          <Link to="/" className="admin-back">
+            <FiArrowLeft /> Back to store
+          </Link>
+        </div>
         <DivOne location={location} />
         <DivTwo location={location} />
         <DivThree location={location} />
@@ -142,24 +143,12 @@ const DivTwo = ({ location }: { location: Location }) => (
 
 const DivThree = ({ location }: { location: Location }) => (
   <div>
-    <h5>Apps</h5>
+    <h5>Tools</h5>
     <ul>
       <Li
-        url="/admin/app/stopwatch"
-        text="Stopwatch"
-        Icon={FaStopwatch}
-        location={location}
-      />
-      <Li
         url="/admin/app/coupon"
-        text="Coupon"
+        text="Coupon generator"
         Icon={RiCoupon3Fill}
-        location={location}
-      />
-      <Li
-        url="/admin/app/toss"
-        text="Toss"
-        Icon={FaGamepad}
         location={location}
       />
     </ul>
@@ -176,14 +165,14 @@ const Li = ({ url, text, location, Icon }: LiProps) => (
   <li
     style={{
       backgroundColor: location.pathname.includes(url)
-        ? "rgba(0,115,255,0.1)"
-        : "white",
+        ? "var(--primary-soft)"
+        : "transparent",
     }}
   >
     <Link
       to={url}
       style={{
-        color: location.pathname.includes(url) ? "rgb(0,115,255)" : "black",
+        color: location.pathname.includes(url) ? "var(--primary)" : "var(--ink-soft)",
       }}
     >
       <Icon />

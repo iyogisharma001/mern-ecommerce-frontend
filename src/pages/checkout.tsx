@@ -1,95 +1,123 @@
-import {
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
-import { useDispatch } from "react-redux";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { FiArrowLeft, FiLock } from "react-icons/fi";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import CheckoutSteps from "../components/checkout-steps";
+import OrderSummary from "../components/order-summary";
 import { useNewOrderMutation } from "../redux/api/orderAPI";
 import { resetCart } from "../redux/reducer/cartReducer";
-import { responseToast } from "../utils/features";
+import { RootState } from "../redux/store";
+import { formatPrice } from "../utils/features";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
 
-// Read from .env (was hard-coded to someone else's Stripe account)
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY);
 
-const CheckOutForm = () => {
+const CheckoutForm = () => {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const total = useSelector((state: RootState) => state.cartReducer.total);
+  const { address, city, pinCode } = useSelector((state: RootState) => state.cartReducer.shippingInfo);
 
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-
+  const [isProcessing, setIsProcessing] = useState(false);
   const [newOrder] = useNewOrderMutation();
 
-  const submitHandler = async (e: FormEvent<HTMLFormElement>) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-
     if (!stripe || !elements) return;
     setIsProcessing(true);
 
     const { paymentIntent, error } = await stripe.confirmPayment({
       elements,
-      // If the bank needs a redirect (3-D Secure), Stripe comes back to
-      // /orders?payment_intent=... and the Orders page confirms the order
+      // 3-D Secure redirects come back to /orders?payment_intent=..., and the
+      // Orders page confirms the order from there
       confirmParams: { return_url: `${window.location.origin}/orders` },
       redirect: "if_required",
     });
 
     if (error) {
       setIsProcessing(false);
-      return toast.error(error.message || "Something Went Wrong");
+      return toast.error(error.message || "Payment failed. Please try another card.");
     }
 
     if (paymentIntent.status === "succeeded") {
-      // Server verifies the payment with Stripe and builds the order itself
+      // The server checks the payment with Stripe and builds the order itself
       const res = await newOrder({ paymentIntentId: paymentIntent.id });
-
       if ("data" in res) {
         dispatch(resetCart());
-        responseToast(res, navigate, "/orders");
+        toast.success("Order placed! Thank you for shopping with us.");
+        navigate("/orders");
       } else {
-        // Money was taken - don't clear the cart silently; the webhook
-        // will still create the order if this call failed
-        toast.error(
-          "Payment received, but we couldn't confirm the order yet. Check My Orders in a minute."
-        );
+        // Money was taken, so keep the cart; the webhook will still create the order
+        toast.error("Payment received, but we couldn't confirm the order yet. Check My Orders in a minute.");
       }
     }
     setIsProcessing(false);
   };
+
   return (
-    <div className="checkout-container">
-      <form onSubmit={submitHandler}>
-        <PaymentElement />
-        <button type="submit" disabled={isProcessing}>
-          {isProcessing ? "Processing..." : "Pay"}
+    <form className="card form-card payment-form" onSubmit={submit}>
+      <div className="payment-address">
+        <span className="text-muted">Delivering to</span>
+        <strong>
+          {address}, {city} {pinCode}
+        </strong>
+        <Link to="/shipping" className="link">
+          Change
+        </Link>
+      </div>
+
+      <PaymentElement />
+
+      <div className="test-card">
+        <strong>Test mode:</strong> use card <code>4242 4242 4242 4242</code>, any future date and any CVC.
+      </div>
+
+      <div className="form-actions">
+        <Link to="/shipping" className="btn btn-ghost">
+          <FiArrowLeft /> Back
+        </Link>
+        <button className="btn btn-primary btn-lg" disabled={!stripe || isProcessing}>
+          <FiLock /> {isProcessing ? "Processing…" : `Pay ${formatPrice(total)}`}
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 };
 
 const Checkout = () => {
+  useDocumentTitle("Payment");
   const location = useLocation();
-
   const clientSecret: string | undefined = location.state;
 
-  if (!clientSecret) return <Navigate to={"/shipping"} />;
+  if (!clientSecret) return <Navigate to="/shipping" />;
 
   return (
-    <Elements
-      options={{
-        clientSecret,
-      }}
-      stripe={stripePromise}
-    >
-      <CheckOutForm />
-    </Elements>
+    <div className="page">
+      <CheckoutSteps current={2} />
+      <h1 className="page-title">Payment</h1>
+      <p className="page-subtitle">Your card details are sent directly to Stripe, never to our servers.</p>
+
+      <div className="checkout-layout">
+        <Elements
+          stripe={stripePromise}
+          options={{
+            clientSecret,
+            appearance: {
+              theme: "stripe",
+              variables: { colorPrimary: "#4338ca", fontFamily: "Inter, system-ui, sans-serif", borderRadius: "8px" },
+            },
+          }}
+        >
+          <CheckoutForm />
+        </Elements>
+        <OrderSummary />
+      </div>
+    </div>
   );
 };
 

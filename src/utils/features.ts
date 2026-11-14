@@ -54,7 +54,27 @@ export const getLastMonths = () => {
   };
 };
 
-export const transformImage = (url: string, width = 200) => {
-  const newUrl = url.replace("upload/", `upload/dpr_auto/w_${width}/`);
-  return newUrl;
-};
+// Resizes Cloudinary images on the fly; other URLs are returned unchanged
+export const transformImage = (url = "", width = 200) =>
+  url.includes("res.cloudinary.com")
+    ? url.replace("upload/", `upload/dpr_auto/w_${width}/`)
+    : url;
+
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+// 169999 -> "₹1,69,999"
+export const formatPrice = (amount: number) => inr.format(amount || 0);
+
+export const formatDate = (date?: string) =>
+  date ? moment(date).format("D MMM YYYY") : "";
+
+// "smartphones" -> "Smartphones"
+export const titleCase = (text = "") =>
+  text.replace(/\b\w/g, (c) => c.toUpperCase());
+
+// Short, readable order number from a Mongo id
+export const shortId = (id = "") => `#${id.slice(-8).toUpperCase()}`;
