@@ -151,7 +151,7 @@ const ProductDetails = () => {
         <div className="reviews-summary card">
           <h2>Customer reviews</h2>
           <div className="reviews-score">
-            <strong>{numOfReviews ? ratings.toFixed(1) : "–"}</strong>
+            <strong className={numOfReviews ? "" : "text-muted"}>{ratings.toFixed(1)}</strong>
             <div>
               <Stars value={ratings} />
               <span className="text-muted">
