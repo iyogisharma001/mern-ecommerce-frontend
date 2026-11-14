@@ -1,161 +1,220 @@
 import { useEffect, useState } from "react";
-import ProductCard from "../components/product-card";
-import {
-  useCategoriesQuery,
-  useSearchProductsQuery,
-} from "../redux/api/productAPI";
-import { CustomError } from "../types/api-types";
 import toast from "react-hot-toast";
-import { Skeleton } from "../components/loader";
-import { CartItem } from "../types/types";
-import { addToCart } from "../redux/reducer/cartReducer";
-import { useDispatch } from "react-redux";
+import { FiChevronLeft, FiChevronRight, FiFilter, FiSearch, FiX } from "react-icons/fi";
 import { useSearchParams } from "react-router-dom";
+import EmptyState from "../components/empty-state";
+import ProductCard, { ProductCardSkeleton } from "../components/product-card";
+import { useCategoriesQuery, useSearchProductsQuery } from "../redux/api/productAPI";
+import { CustomError } from "../types/api-types";
+import { formatPrice, titleCase } from "../utils/features";
+import { useAddToCart } from "../utils/useAddToCart";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
+
+const PRICE_STEPS = [2000, 5000, 10000, 25000, 50000, 100000, 0]; // 0 = any price
+const SORTS = [
+  { value: "", label: "Newest" },
+  { value: "asc", label: "Price: low to high" },
+  { value: "dsc", label: "Price: high to low" },
+];
 
 const Search = () => {
-  const searchQuery = useSearchParams()[0];
+  // All filters live in the URL, so links like /search?category=laptops work
+  // and the back button restores the previous filters
+  const [params, setParams] = useSearchParams();
+  const search = params.get("search") || "";
+  const category = params.get("category") || "";
+  const sort = params.get("sort") || "";
+  const maxPrice = Number(params.get("price")) || 0;
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const {
-    data: categoriesResponse,
-    isLoading: loadingCategories,
-    isError,
-    error,
-  } = useCategoriesQuery("");
+  const [searchInput, setSearchInput] = useState(search);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
 
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("");
-  const [maxPrice, setMaxPrice] = useState(100000);
-  const [category, setCategory] = useState(searchQuery.get("category") || "");
-  const [page, setPage] = useState(1);
+  useDocumentTitle(category ? titleCase(category) : search ? `Results for "${search}"` : "Shop all");
 
-  const {
-    isLoading: productLoading,
-    data: searchedData,
-    isError: productIsError,
-    error: productError,
-  } = useSearchProductsQuery({
-    search,
-    sort,
-    category,
-    page,
-    price: maxPrice,
-  });
+  const addToCart = useAddToCart();
+  const categories = useCategoriesQuery("");
+  const results = useSearchProductsQuery({ search, sort, category, page, price: maxPrice });
 
-  const dispatch = useDispatch();
+  useEffect(() => {
+    if (results.isError)
+      toast.error((results.error as CustomError)?.data?.message || "Could not load products");
+  }, [results.isError, results.error]);
 
-  const addToCartHandler = (cartItem: CartItem) => {
-    if (cartItem.stock < 1) return toast.error("Out of Stock");
-    dispatch(addToCart(cartItem));
-    toast.success("Added to cart");
+  // Any filter change goes back to page 1; changing the page keeps the filters
+  const update = (changes: Record<string, string | number>, keepPage = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(changes).forEach(([key, value]) =>
+      value ? next.set(key, String(value)) : next.delete(key)
+    );
+    if (!keepPage) next.delete("page");
+    setParams(next);
   };
 
-  // Go back to page 1 whenever a filter changes (else you can land on an empty page)
+  // Debounced search box
   useEffect(() => {
-    setPage(1);
-  }, [search, sort, category, maxPrice]);
+    if (searchInput.trim() === search) return;
+    const t = setTimeout(() => update({ search: searchInput.trim() }), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
-  const totalPage = searchedData?.totalPage || 1;
-  const isPrevPage = page > 1;
-  const isNextPage = page < totalPage; // was hard-coded to 4
+  const goToPage = (p: number) => {
+    update({ page: p > 1 ? p : "" }, true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  // Toast once per error, not on every render
-  useEffect(() => {
-    if (isError)
-      toast.error((error as CustomError)?.data?.message || "Something went wrong");
-  }, [isError, error]);
-  useEffect(() => {
-    if (productIsError)
-      toast.error(
-        (productError as CustomError)?.data?.message || "Something went wrong"
-      );
-  }, [productIsError, productError]);
+  const products = results.data?.products || [];
+  const totalPage = results.data?.totalPage || 0;
+  const total = results.data?.total;
+  const hasFilters = Boolean(search || category || maxPrice || sort);
+
   return (
-    <div className="product-search-page">
-      <aside>
-        <h2>Filters</h2>
+    <div className="page shop">
+      <div className="shop-head">
         <div>
-          <h4>Sort</h4>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="">None</option>
-            <option value="asc">Price (Low to High)</option>
-            <option value="dsc">Price (High to Low)</option>
-          </select>
+          <h1 className="page-title">{category ? titleCase(category) : "All products"}</h1>
+          <p className="text-muted">
+            {results.isFetching
+              ? "Loading products…"
+              : total !== undefined
+              ? `${total} product${total === 1 ? "" : "s"}${search ? ` matching "${search}"` : ""}`
+              : ""}
+          </p>
         </div>
 
-        <div>
-          <h4>Max Price: {maxPrice || ""}</h4>
-          <input
-            type="range"
-            min={100}
-            max={100000}
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(Number(e.target.value))}
-          />
-        </div>
-
-        <div>
-          <h4>Category</h4>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="">ALL</option>
-            {!loadingCategories &&
-              categoriesResponse?.categories.map((i) => (
-                <option key={i} value={i}>
-                  {i.toUpperCase()}
-                </option>
-              ))}
-          </select>
-        </div>
-      </aside>
-      <main>
-        <h1>Products</h1>
-        <input
-          type="text"
-          placeholder="Search by name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        {productLoading ? (
-          <Skeleton length={10} />
-        ) : (
-          <div className="search-product-list">
-            {searchedData?.products.map((i) => (
-              <ProductCard
-                key={i._id}
-                productId={i._id}
-                name={i.name}
-                price={i.price}
-                stock={i.stock}
-                handler={addToCartHandler}
-                photos={i.photos}
-              />
+        <div className="shop-toolbar">
+          <button className="btn btn-outline shop-filter-toggle" onClick={() => setFiltersOpen(true)}>
+            <FiFilter /> Filters
+          </button>
+          <label className="sr-only" htmlFor="sort">
+            Sort by
+          </label>
+          <select id="sort" className="input" value={sort} onChange={(e) => update({ sort: e.target.value })}>
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
+      </div>
 
-        {searchedData && searchedData.totalPage > 1 && (
-          <article>
-            <button
-              disabled={!isPrevPage}
-              onClick={() => setPage((prev) => prev - 1)}
-            >
-              Prev
+      <div className="shop-layout">
+        <aside className={`filters card ${filtersOpen ? "open" : ""}`} aria-label="Filters">
+          <div className="filters-head">
+            <h2>Filters</h2>
+            <button className="icon-btn filters-close" onClick={() => setFiltersOpen(false)} aria-label="Close filters">
+              <FiX />
             </button>
-            <span>
-              {page} of {searchedData.totalPage}
-            </span>
-            <button
-              disabled={!isNextPage}
-              onClick={() => setPage((prev) => prev + 1)}
-            >
-              Next
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="search-box">Search</label>
+            <div className="input-icon">
+              <FiSearch />
+              <input
+                id="search-box"
+                className="input"
+                type="search"
+                placeholder="Product name"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <span className="filter-label">Category</span>
+            <div className="filter-options">
+              {["", ...(categories.data?.categories || [])].map((c) => (
+                <label key={c || "all"} className={`chip ${category === c ? "active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="category"
+                    value={c}
+                    checked={category === c}
+                    onChange={() => update({ category: c })}
+                  />
+                  {c ? titleCase(c) : "All"}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <span className="filter-label">Max price</span>
+            <div className="filter-options">
+              {PRICE_STEPS.map((p) => (
+                <label key={p} className={`chip ${maxPrice === p ? "active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="price"
+                    value={p}
+                    checked={maxPrice === p}
+                    onChange={() => update({ price: p })}
+                  />
+                  {p ? `Under ${formatPrice(p)}` : "Any price"}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {hasFilters && (
+            <button className="btn btn-ghost btn-block" onClick={() => setParams(new URLSearchParams())}>
+              Clear all filters
             </button>
-          </article>
-        )}
-      </main>
+          )}
+          <button className="btn btn-primary btn-block filters-apply" onClick={() => setFiltersOpen(false)}>
+            Show results
+          </button>
+        </aside>
+        {filtersOpen && <div className="filters-backdrop" onClick={() => setFiltersOpen(false)} />}
+
+        <section>
+          {results.isLoading ? (
+            <div className="product-grid">
+              {Array.from({ length: 8 }, (_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <EmptyState
+              icon={<FiSearch />}
+              title="No products found"
+              text="Try a different search term, another category or a higher price limit."
+              action={hasFilters ? { label: "Clear filters", to: "/search" } : undefined}
+            />
+          ) : (
+            <div className={`product-grid ${results.isFetching ? "is-fetching" : ""}`}>
+              {products.map((p) => (
+                <ProductCard key={p._id} product={p} onAddToCart={addToCart} />
+              ))}
+            </div>
+          )}
+
+          {totalPage > 1 && (
+            <nav className="pagination" aria-label="Pages">
+              <button className="btn btn-outline btn-sm" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
+                <FiChevronLeft /> Previous
+              </button>
+              <span>
+                Page {page} of {totalPage}
+              </span>
+              <button
+                className="btn btn-outline btn-sm"
+                disabled={page >= totalPage}
+                onClick={() => goToPage(page + 1)}
+              >
+                Next <FiChevronRight />
+              </button>
+            </nav>
+          )}
+        </section>
+      </div>
     </div>
   );
 };

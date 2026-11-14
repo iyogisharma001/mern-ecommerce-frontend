@@ -1,83 +1,100 @@
+import { FiArrowLeft, FiCheck, FiHome, FiPackage, FiTruck } from "react-icons/fi";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { Skeleton } from "../components/loader";
 import { useOrderDetailsQuery } from "../redux/api/orderAPI";
-import { transformImage } from "../utils/features";
+import { formatDate, formatPrice, shortId, titleCase, transformImage } from "../utils/features";
+import { useDocumentTitle } from "../utils/useDocumentTitle";
 
-// Was an empty stub even though /order/:id is routed here
+const STAGES = [
+  { status: "Processing", label: "Order placed", icon: FiPackage },
+  { status: "Shipped", label: "Shipped", icon: FiTruck },
+  { status: "Delivered", label: "Delivered", icon: FiHome },
+];
+
 const OrderDetails = () => {
-  const { id } = useParams();
-  const { data, isLoading, isError } = useOrderDetailsQuery(id!);
+  const { id = "" } = useParams();
+  const { data, isLoading, isError } = useOrderDetailsQuery(id);
+  useDocumentTitle(data ? `Order ${shortId(data.order._id)}` : "Order");
 
   if (isError) return <Navigate to="/orders" />;
-
   if (isLoading || !data)
     return (
-      <div className="container">
-        <Skeleton length={12} />
+      <div className="page narrow">
+        <div className="skeleton-block" style={{ height: 320, borderRadius: 12 }} />
       </div>
     );
 
-  const {
-    orderItems,
-    shippingInfo: { address, city, state, country, pinCode },
-    subtotal,
-    tax,
-    shippingCharges,
-    discount,
-    total,
-    status,
-  } = data.order;
+  const { orderItems, shippingInfo, subtotal, tax, shippingCharges, discount, total, status, createdAt } =
+    data.order;
+  const stage = Math.max(0, STAGES.findIndex((s) => s.status === status));
 
   return (
-    <div className="container">
-      <h1>Order Details</h1>
-      <p>
-        <b>Order ID:</b> {data.order._id}
-      </p>
-      <p>
-        <b>Status:</b>{" "}
-        <span
-          className={
-            status === "Delivered"
-              ? "purple"
-              : status === "Shipped"
-              ? "green"
-              : "red"
-          }
-        >
-          {status}
-        </span>
-      </p>
+    <div className="page narrow">
+      <Link to="/orders" className="back-link">
+        <FiArrowLeft /> All orders
+      </Link>
 
-      <h2>Items</h2>
-      {orderItems.map((i) => (
-        <div
-          key={i._id}
-          style={{ display: "flex", gap: "1rem", alignItems: "center", margin: "1rem 0" }}
-        >
-          <img
-            src={transformImage(i.photo)}
-            alt={i.name}
-            style={{ width: 64, height: 64, objectFit: "cover" }}
-          />
-          <Link to={`/product/${i.productId}`}>{i.name}</Link>
-          <span>
-            ₹{i.price} × {i.quantity} = ₹{i.price * i.quantity}
-          </span>
+      <div className="order-header">
+        <div>
+          <h1 className="page-title">Order {shortId(data.order._id)}</h1>
+          <p className="text-muted">Placed on {formatDate(createdAt)}</p>
         </div>
-      ))}
+        <span className={`badge status-badge ${status.toLowerCase()}`}>{status}</span>
+      </div>
 
-      <h2>Shipping</h2>
-      <p>{`${address}, ${city}, ${state}, ${country} ${pinCode}`}</p>
+      <ol className="tracker card" aria-label="Delivery progress">
+        {STAGES.map(({ label, icon: Icon }, i) => (
+          <li key={label} className={i <= stage ? "done" : ""}>
+            <span>{i < stage ? <FiCheck /> : <Icon />}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
 
-      <h2>Amount</h2>
-      <p>Subtotal: ₹{subtotal}</p>
-      <p>Shipping Charges: ₹{shippingCharges}</p>
-      <p>Tax: ₹{tax}</p>
-      <p>Discount: - ₹{discount}</p>
-      <p>
-        <b>Total: ₹{total}</b>
-      </p>
+      <div className="order-grid">
+        <section className="card order-items">
+          <h2>Items</h2>
+          {orderItems.map((item) => (
+            <div key={item._id} className="order-item">
+              <img src={transformImage(item.photo, 160)} alt="" />
+              <div>
+                <Link to={`/product/${item.productId}`} className="cart-item-name">
+                  {item.name}
+                </Link>
+                <span className="text-muted">
+                  {formatPrice(item.price)} × {item.quantity}
+                </span>
+              </div>
+              <strong>{formatPrice(item.price * item.quantity)}</strong>
+            </div>
+          ))}
+        </section>
+
+        <div className="order-side">
+          <section className="card order-box">
+            <h2>Delivery address</h2>
+            <p>
+              {shippingInfo.address}
+              <br />
+              {shippingInfo.city}, {shippingInfo.state} {shippingInfo.pinCode}
+              <br />
+              {titleCase(shippingInfo.country)}
+            </p>
+          </section>
+
+          <section className="card order-box">
+            <h2>Payment</h2>
+            <dl className="price-list">
+              <div><dt>Subtotal</dt><dd>{formatPrice(subtotal)}</dd></div>
+              <div><dt>Delivery</dt><dd>{shippingCharges ? formatPrice(shippingCharges) : "Free"}</dd></div>
+              <div><dt>GST (18%)</dt><dd>{formatPrice(tax)}</dd></div>
+              {discount > 0 && (
+                <div className="discount"><dt>Coupon discount</dt><dd>−{formatPrice(discount)}</dd></div>
+              )}
+              <div className="total"><dt>Total paid</dt><dd>{formatPrice(total)}</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
     </div>
   );
 };

@@ -48,6 +48,7 @@ export type CategoriesResponse = {
 
 export type SearchProductsResponse = AllProductsResponse & {
   totalPage: number;
+  total?: number; // number of matching products (all pages)
 };
 export type SearchProductsRequest = {
   price: number;

@@ -1,56 +1,74 @@
-import { FaExpandAlt, FaPlus } from "react-icons/fa";
+import { FiShoppingBag } from "react-icons/fi";
 import { Link } from "react-router-dom";
-import { CartItem } from "../types/types";
-import { transformImage } from "../utils/features";
+import { CartItem, Product } from "../types/types";
+import { formatPrice, transformImage } from "../utils/features";
+import Stars from "./ratings";
 
-type ProductsProps = {
-  productId: string;
-  photos: {
-    url: string;
-    public_id: string;
-  }[];
-  name: string;
-  price: number;
-  stock: number;
-  handler: (cartItem: CartItem) => string | undefined;
+type Props = {
+  product: Product;
+  onAddToCart: (cartItem: CartItem) => void;
 };
 
-const ProductCard = ({
-  productId,
-  price,
-  name,
-  photos,
-  stock,
-  handler,
-}: ProductsProps) => {
+const ProductCard = ({ product, onAddToCart }: Props) => {
+  const { _id, name, price, stock, photos, category, ratings, numOfReviews } = product;
+  const photo = photos?.[0]?.url || "";
+  const outOfStock = stock < 1;
+
   return (
-    <div className="product-card">
-      <img src={transformImage(photos?.[0]?.url, 400)} alt={name} />
-      <p>{name}</p>
-      <span>₹{price}</span>
+    <article className="product-card">
+      <Link to={`/product/${_id}`} className="product-card-media">
+        <img src={transformImage(photo, 500)} alt={name} loading="lazy" />
+        {outOfStock ? (
+          <span className="badge badge-danger product-card-flag">Sold out</span>
+        ) : stock <= 5 ? (
+          <span className="badge badge-warning product-card-flag">Only {stock} left</span>
+        ) : null}
+      </Link>
 
-      <div>
-        <button
-          onClick={() =>
-            handler({
-              productId,
-              price,
-              name,
-              photo: photos[0].url,
-              stock,
-              quantity: 1,
-            })
-          }
-        >
-          <FaPlus />
-        </button>
-
-        <Link to={`/product/${productId}`}>
-          <FaExpandAlt />
+      <div className="product-card-body">
+        <span className="product-card-category">{category}</span>
+        <Link to={`/product/${_id}`} className="product-card-name">
+          {name}
         </Link>
+
+        <div className="product-card-rating">
+          {numOfReviews > 0 ? (
+            <>
+              <Stars value={ratings} size="sm" />
+              <span>({numOfReviews})</span>
+            </>
+          ) : (
+            <span className="text-muted">No reviews yet</span>
+          )}
+        </div>
+
+        <div className="product-card-footer">
+          <strong>{formatPrice(price)}</strong>
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={outOfStock}
+            onClick={() =>
+              onAddToCart({ productId: _id, name, price, stock, photo, quantity: 1 })
+            }
+            aria-label={`Add ${name} to cart`}
+          >
+            <FiShoppingBag /> Add
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   );
 };
+
+export const ProductCardSkeleton = () => (
+  <div className="product-card product-card-skeleton" aria-hidden="true">
+    <div className="skeleton-block media" />
+    <div className="product-card-body">
+      <div className="skeleton-block line short" />
+      <div className="skeleton-block line" />
+      <div className="skeleton-block line short" />
+    </div>
+  </div>
+);
 
 export default ProductCard;
